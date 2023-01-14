@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+    <title>
+      Tailwind Starter Template - Day Admin Template: Tailwind Toolbox
+    </title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <meta name="description" content="description here" />
+    <meta name="keywords" content="keywords,here" />
+<meta name="csrf-token" content="{{ csrf_token }}" />
+    <link
+      href="https://cdn.jsdelivr.net/npm/daisyui@2.46.1/dist/full.css"
+      rel="stylesheet"
+      type="text/css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://use.fontawesome.com/releases/v5.3.1/css/all.css"
+      integrity="sha384-mzrmE5qonljUremFsqc01SB46JvROS7bZs3IO2EmfFsd15uHvIt+Y8vEf7N7fWAU"
+      crossorigin="anonymous"
+    />
+    <script src="https://cdn.tailwindcss.com"></script>
+    {% load static %} <link href={% static 'styles/index.css' % }
+    rel="stylesheet" />
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Inter&Roboto:wght@400;500;600;700&display=swap");
+      body {
+        font-family: "Roboto", sans-serif;
+      }
+    </style>
+  </head>
+  <body class="h-screen flex flex-col">
+    <header class="flex items-center p-4 justify-between bg-neutral">
+      <div class="logo text-4xl">ChatBot</div>
+      <div class="nav-items">
+        <ul class="flex gap-4 items-center">
+          <li>
+            <a href="#login">Login</a>
+          </li>
+          <li>
+            <div class="btn btn-primary">Minha Conta</div>
+          </li>
+        </ul>
+      </div>
+    </header>
+    <div
+      class="interface flex flex-col items-center md:flex-row md:items-start flex-1 gap-4 p-4"
+    >
+      <div class="users">
+        <h2 class="text-xl mb-2 text-primary">Usuários deste chat:</h2>
+        <ul class="flex flex-col gap-2">
+          {% for user in users %}
+          <li class="flex gap-2 items-center w-full">
+            <input 
+              type="radio" name="selected"
+              value="{{user.user_id}}"
+              class="hidden"
+              id="user-{{user.user_id}}"
+            />
+            <label
+              for="user-{{user.user_id}}"
+              class="cursor-pointer flex gap-4 items-center rounded-md p-4 border-2 border-transparent w-full"
+            >
+            <div class="h-16 w-16 rounded-full border border-zinc-200 overflow-hidden"">
+
+              <img src="{{ user.image }}" class="h-full w-full" alt="" />
+            </div>
+              <h2 class="user-name text-xl">{{ user.name }}</h2>
+              <span class="ml-auto">{{ user.type }}</span>
+            </label>
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+      <div
+        class="chat-container min-w-0 flex flex-col gap-4 flex-1 p-4 bg-neutral rounded-md w-full"
+      >
+        <ul class="flex-1 flex flex-col gap-2 max-h-[calc(100vh-15rem)] overflow-auto">
+          {% for message in messages %}
+          <li class="flex gap-2 items-center">
+            <h2
+              class="user-name p-3 rounded-md bg-primary {% if message.user.type == 'collaborator' %} ml-auto {% endif %}"
+            >
+              {{ message }}
+            </h2>
+            <!-- <span> {{message.created_at|date:"d/m/Y H:i"}} </span> -->
+          </li>
+          {% endfor %}
+        </ul>
+      <form
+        method="post"
+        onsubmit="submitHandler(event)"
+        action="/add-message"
+        class="w-full flex gap-2 items-center"
+      >
+        {% csrf_token %}
+        <textarea
+          class="rounded-md bg-base-200 w-full p-4 resize-none"
+          name="message"
+          placeholder="Digite aqui sua mensagem..."
+          id="message"
+        ></textarea>
+        <input class="hidden" type="text" name="user_id" value="1" />
+        <input class="hidden" type="text" name="chat_id" value="1" />
+        <button class="btn btn-primary" type="submit">Enviar</button>
+      </form>
+      </div>
+
+      <div id="chat-messages"></div>
+    </div>
+    <script type="text/javascript">
+      $(document).ready(function () {
+        let currentSelectedId = document.querySelector("input[name='selected']").value;
+        let currentMessagesLength = $(".chat-container ul li").length;
+        
+        $("label").click((e) => {
+          currentSelectedId = e.currentTarget.htmlFor.split("-")[1];
+          $("input[name='user_id']").val(currentSelectedId);
+            $("label").removeClass("border-zinc-200");
+            $("label").addClass("border-transparent");
+            e.currentTarget.classList.remove("border-transparent");
+            e.currentTarget.classList.add("border-zinc-200");
+        })
+          
+        setInterval(async function () {
+          let shouldFetch = false;
+
+          await $.ajax({
+            url: "/has-mutated",
+            dataType: "json",
+            success: function (data) {
+              if (data === true) shouldFetch = true
+            }
+          })
+
+          if (!shouldFetch) {
+            return;
+          };
+        
+          console.log("Fetching messages...")
+
+          $.ajax({
+            url: "/get-messages/",
+            dataType: "json",
+            success: function (data) {
+              if (currentMessagesLength === data.messages.length) return;
+
+              let users = JSON.parse("{{users}}".replaceAll("&#x27;", '"'));
+
+              if (data.messages.length > currentMessagesLength) {
+                const user = users.find(
+                  (user) =>
+                    user.user_id ===
+                    data.messages[data.messages.length - 1].user_id
+                );
+                const newMessage = $(`<li class="flex gap-2 items-center">
+                  <h2 class="user-name p-3 rounded-md bg-primary ${
+                    user.type === "collaborator" ? "ml-auto" : ""
+                  }">${data.messages[data.messages.length - 1].content}</h2>
+                  </li>`);
+                $(".chat-container ul").append(newMessage);
+              } else {
+                $(".chat-container ul").html("");
+
+                for (var i = 0; i < data.messages.length; i++) {
+                  const user = users.find(
+                    (user) => user.user_id === data.messages[i].user_id
+                  );
+                  const newMessage = $(`<li class="flex gap-2 items-center">
+                  <h2 class="user-name p-3 rounded-md bg-primary ${
+                    user.type === "collaborator" ? "ml-auto" : ""
+                  }">${data.messages[i].content}</h2>
+                  </li>`);
+
+                  $(".chat-container ul").append(newMessage);
+                }
+              }
+
+              currentMessagesLength = data.messages.length;
+            }
+          });
+        }, 1000); // Send the request every 5 seconds
+      });
+      function submitHandler(e) {
+        e.preventDefault();
+        const body = {
+          message: e.target.message.value,
+          user_id: e.target.user_id.value,
+          chat_id: e.target.chat_id.value
+        };
+
+        // $.ajax({
+        //   url:'/add-message',
+        //   type:'POST',
+        //   data: body,
+        //   success:function(data){
+        //     console.log(data);
+        //   },
+        //   error:function(error){
+        //     console.log(error);
+        //   }
+        // });
+
+          const csrfToken = $('meta[name="csrf-token"]').attr('content');
+
+        fetch("/add-message", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            // "X-CSRF-TOKEN": csrfToken
+          },
+          // credentials: 'include',
+          body: JSON.stringify(body)
+        }).then((res) => console.log(res));
+
+        // e.target.submit();
+        const message = document.querySelector("#message").value;
+      }
+    </script>
+  </body>
+</html>
